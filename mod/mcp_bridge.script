@@ -1,0 +1,276 @@
+--[[
+	MCP Bridge — игровая сторона сервера stalker-mcp (https://github.com/DrakuXYZ/stalker-mcp).
+
+	Обмен через папку BRIDGE_DIR. Она обязана лежать вне папки игры: внутри неё
+	MO2 перенаправляет все новые файлы в overwrite, и сервер их не увидит.
+	Путь совпадает с STALKER_BRIDGE сервера.
+	  req.lua         — Lua-код от сервера: первая строка `--mcp:<id>`,
+	                    последняя `--mcp:end`; пустой файл — запроса нет
+	  resp.json       — результат: {id, ok, result, output, error}
+	  heartbeat.json  — пульс раз в секунду, по нему сервер видит, что игра жива
+
+	Запрос всегда один и лежит по известному пути: опрос — это попытка
+	io.open. lfs.dir здесь не годится — его итератор роняет движок, если
+	вызвать его из Update главного меню.
+
+	Файлы req.lua и resp.json никогда не удаляются, только перезаписываются:
+	usvfs MO2 запоминает файлы на старте игры, и созданный позже файл игра
+	не видит даже вне папки игры. Сервер создаёт их заранее.
+
+	Опрос идёт из actor_on_update, а после первой загрузки ещё и из Update
+	главного меню, поэтому мост работает и на паузе, и после смерти.
+--]]
+
+local POLL_MS      = 100
+local HEARTBEAT_MS = 1000
+local MAX_DEPTH    = 6
+local MAX_ITEMS    = 1000
+local VERSION      = 3
+local BRIDGE_DIR   = "{{BRIDGE_DIR}}" -- подставляет `python server.py install`
+
+local REQ_PATH     = BRIDGE_DIR .. "req.lua"
+local RESP_PATH    = BRIDGE_DIR .. "resp.json"
+local BEAT_PATH    = BRIDGE_DIR .. "heartbeat.json"
+
+local last_poll, last_beat = 0, 0
+local busy = false
+local last_id
+local env -- общее окружение запросов, переменные живут между вызовами
+
+local function now_ms()
+	return device():time_continual()
+end
+
+------------------------------------------------------------------------
+-- JSON
+------------------------------------------------------------------------
+local escapes = { ['"'] = '\\"', ['\\'] = '\\\\', ['\n'] = '\\n', ['\r'] = '\\r', ['\t'] = '\\t' }
+
+local function json_str(s)
+	-- байты >= 0x80 идут как есть: сервер сам различает UTF-8 и cp1251
+	return '"' .. s:gsub('[%c"\\]', function(c)
+		return escapes[c] or string.format("\\u%04x", c:byte())
+	end) .. '"'
+end
+
+local encode
+
+local function encode_userdata(v, depth, seen)
+	local ok, id, name, sec = pcall(function() return v:id(), v:name(), v:section() end)
+	if ok and type(id) == "number" then
+		return encode({ id = id, name = name, section = sec }, depth, seen)
+	end
+	local ok2, x, y, z = pcall(function() return v.x, v.y, v.z end)
+	if ok2 and type(x) == "number" and type(y) == "number" then
+		return encode({ x = x, y = y, z = z }, depth, seen)
+	end
+	return json_str(tostring(v))
+end
+
+encode = function(v, depth, seen)
+	local t = type(v)
+	if t == "nil" then
+		return "null"
+	elseif t == "boolean" then
+		return v and "true" or "false"
+	elseif t == "number" then
+		if v ~= v or v == math.huge or v == -math.huge then
+			return json_str(tostring(v))
+		end
+		if v == math.floor(v) and math.abs(v) < 1e15 then
+			return string.format("%d", v)
+		end
+		return string.format("%.10g", v)
+	elseif t == "string" then
+		return json_str(v)
+	elseif t == "userdata" then
+		return encode_userdata(v, depth, seen)
+	elseif t ~= "table" then
+		return json_str("<" .. t .. ">")
+	end
+
+	if seen[v] then return json_str("<cycle>") end
+	if depth >= MAX_DEPTH then return json_str("<table>") end
+	seen[v] = true
+
+	local n, count = #v, 0
+	for _ in pairs(v) do count = count + 1 end
+
+	local parts = {}
+	if count == n and n > 0 then
+		for i = 1, math.min(n, MAX_ITEMS) do
+			parts[i] = encode(v[i], depth + 1, seen)
+		end
+		if n > MAX_ITEMS then parts[#parts + 1] = json_str("<+" .. (n - MAX_ITEMS) .. " more>") end
+		seen[v] = nil
+		return "[" .. table.concat(parts, ",") .. "]"
+	end
+
+	for k, val in pairs(v) do
+		if #parts >= MAX_ITEMS then
+			parts[#parts + 1] = json_str("...") .. ":" .. json_str("<+" .. (count - MAX_ITEMS) .. " more>")
+			break
+		end
+		parts[#parts + 1] = json_str(tostring(k)) .. ":" .. encode(val, depth + 1, seen)
+	end
+	seen[v] = nil
+	return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function to_json(v)
+	return encode(v, 0, {})
+end
+
+------------------------------------------------------------------------
+-- Файлы
+------------------------------------------------------------------------
+local function read_file(path)
+	local f = io.open(path, "rb")
+	if not f then return nil end
+	local data = f:read("*a")
+	f:close()
+	return data
+end
+
+-- Пишем напрямую, без tmp+rename: os.rename вне папки игры под MO2 (usvfs)
+-- молча не срабатывает. Недописанный файл сервер просто перечитывает.
+local function write_file(path, data)
+	local f = io.open(path, "wb")
+	if not f then return false end
+	f:write(data)
+	f:close()
+	return true
+end
+
+------------------------------------------------------------------------
+-- Исполнение запросов
+------------------------------------------------------------------------
+local function make_env()
+	local e = setmetatable({}, { __index = _G })
+	e._G_real = _G
+	e.to_json = to_json
+	return e
+end
+
+local function run_code(code)
+	env = env or make_env()
+	local output = {}
+	env.print = function(...)
+		local t = {}
+		for i = 1, select("#", ...) do t[i] = tostring((select(i, ...))) end
+		output[#output + 1] = table.concat(t, "\t")
+	end
+	env.out = env.print
+
+	-- как в REPL: сначала пробуем как выражение, потом как блок
+	local chunk = loadstring("return " .. code, "=mcp")
+	local err
+	if not chunk then
+		chunk, err = loadstring(code, "=mcp")
+	end
+	if not chunk then
+		return { ok = false, error = "syntax: " .. tostring(err), output = output }
+	end
+	setfenv(chunk, env)
+
+	local packed = { xpcall(chunk, debug.traceback) }
+	local n = table.maxn(packed)
+	if not packed[1] then
+		return { ok = false, error = tostring(packed[2]), output = output }
+	end
+
+	local result
+	if n == 2 then
+		result = packed[2]
+	elseif n > 2 then
+		result = {}
+		for i = 2, n do result[i - 1] = packed[i] end
+	end
+	return { ok = true, result = result, output = output }
+end
+
+local function process_request()
+	local code = read_file(REQ_PATH)
+	if not code or code == "" then return end
+	local id = code:match("^%-%-mcp:([%w_]+)")
+	-- без маркера конца файл ещё дописывается — заберём на следующем опросе
+	if not id or id == last_id or not code:find("%-%-mcp:end%s*$") then return end
+	last_id = id
+	write_file(REQ_PATH, "")
+
+	local t0 = now_ms()
+	local ok, res = pcall(run_code, code)
+	if not ok then res = { ok = false, error = "bridge: " .. tostring(res) } end
+	res.id = id
+	res.ms = now_ms() - t0
+	local ok_json, json = pcall(to_json, res)
+	if not ok_json then
+		json = to_json({ id = id, ok = false, error = "encode: " .. tostring(json) })
+	end
+	write_file(RESP_PATH, json)
+end
+
+local function write_heartbeat(where)
+	local info = { version = VERSION, time = os.time(), where = where }
+	if level.present() then
+		info.level = level.name()
+		if db.actor then
+			info.actor_alive = db.actor:alive()
+		end
+	end
+	write_file(BEAT_PATH, to_json(info))
+end
+
+local function tick(where)
+	if busy then return end
+	local t = now_ms()
+	-- time_continual бывает откатывается назад (после g_always_active on),
+	-- без сброса мост молчал бы, пока время не догонит старые отметки
+	if t < last_poll or t < last_beat then
+		last_poll, last_beat = 0, 0
+	end
+	if t - last_poll < POLL_MS then return end
+	last_poll = t
+
+	busy = true
+	local ok, err = pcall(process_request)
+	busy = false
+	if not ok then printf("![MCP] request error: %s", tostring(err)) end
+
+	if t - last_beat >= HEARTBEAT_MS then
+		last_beat = t
+		pcall(write_heartbeat, where)
+	end
+end
+
+local function actor_on_update()
+	tick("game")
+end
+
+------------------------------------------------------------------------
+-- Главное меню: ESC-пауза, экран смерти, выход в меню после загрузки
+------------------------------------------------------------------------
+local function hook_main_menu()
+	local cls = ui_main_menu and ui_main_menu.main_menu
+	if not cls or cls.__mcp_hooked then return end
+	local base_update = cls.Update
+	cls.Update = function(self)
+		base_update(self)
+		tick("menu")
+	end
+	cls.__mcp_hooked = true
+	printf("[MCP] main menu hook installed")
+end
+
+-- Пауза (клавиша Pause, старт без фокуса): скриптовых апдейтов нет, движок Radius
+-- зовёт _G.on_paused_tick() 4 раза в секунду. На других движках просто не вызывается.
+function _G.on_paused_tick()
+	tick("pause")
+end
+
+function on_game_start()
+	RegisterScriptCallback("actor_on_update", actor_on_update)
+	local ok, err = pcall(hook_main_menu)
+	if not ok then printf("![MCP] main menu hook failed: %s", tostring(err)) end
+	printf("[MCP] bridge v%s ready: %s", VERSION, BRIDGE_DIR)
+end
