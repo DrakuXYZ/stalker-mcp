@@ -1,5 +1,6 @@
 --[[
 	MCP Bridge — игровая сторона сервера stalker-mcp (https://github.com/DrakuXYZ/stalker-mcp).
+	Copyright (c) 2026 DrakuXYZ. CC BY-NC-ND 4.0: без изменений и без продажи, см. LICENSE.
 
 	Обмен через папку BRIDGE_DIR. Она обязана лежать вне папки игры: внутри неё
 	MO2 перенаправляет все новые файлы в overwrite, и сервер их не увидит.

@@ -13,7 +13,7 @@
 ![Anomaly](https://img.shields.io/badge/Anomaly-1.5.x-8B0000)
 ![MO2](https://img.shields.io/badge/Mod%20Organizer-2-4B6EAF)
 ![Windows](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![License](https://img.shields.io/badge/license-CC%20BY--NC--ND%204.0-lightgrey)](LICENSE)
 
 <a href="README.md"><img alt="English" src="https://img.shields.io/badge/English-555555?style=for-the-badge"></a>
 <a href="README.ru.md"><img alt="Русский" src="https://img.shields.io/badge/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-2ea44f?style=for-the-badge"></a>
@@ -265,6 +265,20 @@ stalker-mcp — обычный MCP-сервер, он **не привязан к
 | `мост версии X, сервер ждёт Y` | Перезапусти игру после обновления моста |
 | Сервер не стартует | Не заданы `STALKER_GAME` / `STALKER_MO2` или папок нет |
 
+## Отказ от ответственности
+
+stalker-mcp предоставляется **как есть**, без каких-либо гарантий. Ты используешь его на свой риск.
+Автор **не отвечает** за то, что случится с игрой, сейвами, модами, сборкой, файлами или компьютером,
+в том числе за действия ИИ-ассистента через эти инструменты. Если ты делаешь на его основе сборку
+или инструмент, этот проект и его последствия — на тебе.
+
 ## Лицензия
 
-[MIT](LICENSE). S.T.A.L.K.E.R. — торговая марка GSC Game World. Это неофициальный фанатский инструмент.
+[CC BY-NC-ND 4.0](LICENSE) © 2026 DrakuXYZ
+
+| | |
+|---|---|
+| ✅ Пользоваться — для себя и в своём моддинге | ✅ Бесплатно делиться копиями без изменений, указав автора |
+| ❌ Продавать и использовать в коммерческих целях | ❌ Распространять изменённые версии |
+
+S.T.A.L.K.E.R. — торговая марка GSC Game World. Это неофициальный фанатский инструмент.

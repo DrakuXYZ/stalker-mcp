@@ -13,7 +13,7 @@ spawn items, read logs and crashes, take screenshots, resolve mod conflicts.
 ![Anomaly](https://img.shields.io/badge/Anomaly-1.5.x-8B0000)
 ![MO2](https://img.shields.io/badge/Mod%20Organizer-2-4B6EAF)
 ![Windows](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![License](https://img.shields.io/badge/license-CC%20BY--NC--ND%204.0-lightgrey)](LICENSE)
 
 <a href="README.md"><img alt="English" src="https://img.shields.io/badge/English-2ea44f?style=for-the-badge"></a>
 <a href="README.ru.md"><img alt="Русский" src="https://img.shields.io/badge/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-555555?style=for-the-badge"></a>
@@ -268,6 +268,20 @@ so that code can do anything your Windows user can do.
 | `мост версии X, сервер ждёт Y` (version mismatch) | Restart the game after updating the bridge |
 | The server does not start | `STALKER_GAME` / `STALKER_MO2` are not set or point to missing folders |
 
+## Disclaimer
+
+stalker-mcp is provided **as is**, without any warranty. You use it at your own risk.
+The author is **not responsible** for anything that happens to your game, saves, mods, modpack,
+files or computer, including actions taken by an AI assistant through these tools.
+If you build a modpack or a tool on top of it, that project and its consequences are yours.
+
 ## License
 
-[MIT](LICENSE). S.T.A.L.K.E.R. is a trademark of GSC Game World. This is an unofficial fan tool.
+[CC BY-NC-ND 4.0](LICENSE) © 2026 DrakuXYZ
+
+| | |
+|---|---|
+| ✅ Use it, for yourself or in your modding work | ✅ Share unmodified copies for free, crediting the author |
+| ❌ Sell it or use it commercially | ❌ Distribute modified versions |
+
+S.T.A.L.K.E.R. is a trademark of GSC Game World. This is an unofficial fan tool.

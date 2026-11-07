@@ -1,5 +1,8 @@
 """stalker-mcp: MCP-сервер для S.T.A.L.K.E.R. Anomaly (xray-monolith) под MO2.
 
+Copyright (c) 2026 DrakuXYZ. CC BY-NC-ND 4.0, см. LICENSE.
+https://github.com/DrakuXYZ/stalker-mcp
+
 Связь с живой игрой идёт через папку обмена (см. mod/mcp_bridge.script):
 сервер кладёт Lua-код в req.lua, игра исполняет его и отвечает в resp.json.
 Остальные инструменты работают без игры: логи, моды MO2, поиск по файлам
