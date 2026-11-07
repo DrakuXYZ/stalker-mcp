@@ -88,7 +88,8 @@ flowchart LR
 * S.T.A.L.K.E.R. Anomaly 1.5.x (и сборки на нём, например GAMMA)
 * **Портативный** Mod Organizer 2
 * Python 3.10+
-* MCP-клиент: [Claude Code](https://claude.com/claude-code), Claude Desktop или любой другой
+* MCP-клиент, который умеет запускать **локальные (stdio)** серверы: Claude Code, Claude Desktop,
+  Codex CLI, Gemini CLI, Kimi CLI, Cursor, VS Code, Cline, LM Studio… (см. [Совместимость](#совместимость))
 
 ## Установка
 
@@ -115,16 +116,31 @@ $env:STALKER_MO2  = "D:\Games\Anomaly\MO2"   # папка с ModOrganizer.exe
 
 **3. Подключение к MCP-клиенту**
 
-Claude Code:
+Любому клиенту нужны три вещи: команда (`.venv\Scripts\python.exe`), аргумент (`server.py`)
+и две переменные окружения. Выбери свой:
 
-```powershell
-claude mcp add stalker -s user `
-  -e STALKER_GAME=D:\Games\Anomaly `
-  -e STALKER_MO2=D:\Games\Anomaly\MO2 `
-  -- D:\stalker-mcp\.venv\Scripts\python.exe D:\stalker-mcp\server.py
+<details open>
+<summary><b>Claude Code</b></summary>
+
+Выполни в `cmd` или Git Bash (Windows PowerShell 5.1 съедает `--`):
+
+```bat
+claude mcp add stalker -s user -e STALKER_GAME=D:\Games\Anomaly -e STALKER_MO2=D:\Games\Anomaly\MO2 -- D:\stalker-mcp\.venv\Scripts\python.exe D:\stalker-mcp\server.py
 ```
 
-Claude Desktop (`claude_desktop_config.json`) и большинство других клиентов:
+</details>
+
+<details>
+<summary><b>Claude Desktop · Cursor · Gemini CLI · Kimi CLI · Cline · LM Studio</b></summary>
+
+У всех один и тот же JSON `mcpServers`. Положи его в файл настроек MCP клиента:
+
+| Клиент | Файл настроек |
+|---|---|
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Cursor | `%USERPROFILE%\.cursor\mcp.json` (или `.cursor\mcp.json` в проекте) |
+| Gemini CLI | `%USERPROFILE%\.gemini\settings.json` |
+| Kimi CLI, Cline, LM Studio | файл настроек MCP клиента (тот же формат) |
 
 ```json
 {
@@ -140,6 +156,48 @@ Claude Desktop (`claude_desktop_config.json`) и большинство друг
   }
 }
 ```
+
+</details>
+
+<details>
+<summary><b>OpenAI Codex CLI</b></summary>
+
+`%USERPROFILE%\.codex\config.toml`:
+
+```toml
+[mcp_servers.stalker]
+command = 'D:\stalker-mcp\.venv\Scripts\python.exe'
+args = ['D:\stalker-mcp\server.py']
+
+[mcp_servers.stalker.env]
+STALKER_GAME = 'D:\Games\Anomaly'
+STALKER_MO2 = 'D:\Games\Anomaly\MO2'
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (GitHub Copilot)</b></summary>
+
+`.vscode\mcp.json` в рабочей папке (ключ `servers`, а не `mcpServers`):
+
+```json
+{
+  "servers": {
+    "stalker": {
+      "type": "stdio",
+      "command": "D:\\stalker-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["D:\\stalker-mcp\\server.py"],
+      "env": {
+        "STALKER_GAME": "D:\\Games\\Anomaly",
+        "STALKER_MO2": "D:\\Games\\Anomaly\\MO2"
+      }
+    }
+  }
+}
+```
+
+</details>
 
 **4. Играй.** Запусти игру из MO2 (или попроси ассистента вызвать `game_launch`), загрузи сейв
 и спрашивай. Связь проверяется через `game_status`: мост должен быть `онлайн`.
@@ -170,6 +228,22 @@ Claude Desktop (`claude_desktop_config.json`) и большинство друг
 * **`mo2_set_mod` — только при закрытом MO2.** MO2 перезаписывает `modlist.txt` при выходе.
 * Строки из движка приходят в cp1251, сервер их декодирует. Кириллица в запросах уходит в cp1251,
   поэтому совпадает со строками самой игры.
+
+## Совместимость
+
+stalker-mcp — обычный MCP-сервер, он **не привязан к Claude**. Работает любой клиент, который
+запускает локальные (stdio) MCP-серверы, с любой моделью внутри: Claude, GPT, Kimi, Gemini, Qwen,
+локальная LLM.
+
+| | Статус |
+|---|---|
+| Claude Code, Claude Desktop, Codex CLI, Gemini CLI, Kimi CLI, Cursor, VS Code, Cline, LM Studio | ✅ работает как есть |
+| ChatGPT (сайт / приложение) | ❌ подключает только удалённые HTTP-серверы, а не локальный процесс |
+| `game_screenshot` | нужны клиент **и** модель, которые принимают картинки в ответах инструментов; остальное — текст |
+| Небольшие локальные модели | могут хуже выбирать инструменты: их описания на русском |
+
+> [!WARNING]
+> Не открывай сервер в интернет ради ChatGPT: через `game_lua` любой сможет исполнять код на твоём ПК.
 
 ## ⚠️ Безопасность
 

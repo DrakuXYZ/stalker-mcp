@@ -88,7 +88,8 @@ Globals you define persist between calls, and `print()` output is collected.
 * S.T.A.L.K.E.R. Anomaly 1.5.x (also works with modpacks built on it, e.g. GAMMA)
 * A **portable** Mod Organizer 2 instance
 * Python 3.10+
-* An MCP client: [Claude Code](https://claude.com/claude-code), Claude Desktop or any other
+* An MCP client that can run **local (stdio)** servers: Claude Code, Claude Desktop, Codex CLI,
+  Gemini CLI, Kimi CLI, Cursor, VS Code, Cline, LM Studio… (see [Compatibility](#compatibility))
 
 ## Installation
 
@@ -115,16 +116,31 @@ This writes `mods\MCP-Bridge` with the bridge path filled in and enables it in t
 
 **3. Connect your MCP client**
 
-Claude Code:
+Every client needs the same three things: the command (`.venv\Scripts\python.exe`), the argument
+(`server.py`) and the two environment variables. Pick yours:
 
-```powershell
-claude mcp add stalker -s user `
-  -e STALKER_GAME=D:\Games\Anomaly `
-  -e STALKER_MO2=D:\Games\Anomaly\MO2 `
-  -- D:\stalker-mcp\.venv\Scripts\python.exe D:\stalker-mcp\server.py
+<details open>
+<summary><b>Claude Code</b></summary>
+
+Run in `cmd` or Git Bash (Windows PowerShell 5.1 swallows the `--`):
+
+```bat
+claude mcp add stalker -s user -e STALKER_GAME=D:\Games\Anomaly -e STALKER_MO2=D:\Games\Anomaly\MO2 -- D:\stalker-mcp\.venv\Scripts\python.exe D:\stalker-mcp\server.py
 ```
 
-Claude Desktop (`claude_desktop_config.json`) and most other clients:
+</details>
+
+<details>
+<summary><b>Claude Desktop · Cursor · Gemini CLI · Kimi CLI · Cline · LM Studio</b></summary>
+
+All of them use the same `mcpServers` JSON. Put it into the client's MCP config file:
+
+| Client | Config file |
+|---|---|
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Cursor | `%USERPROFILE%\.cursor\mcp.json` (or `.cursor\mcp.json` in a project) |
+| Gemini CLI | `%USERPROFILE%\.gemini\settings.json` |
+| Kimi CLI, Cline, LM Studio | the MCP settings file of the client (same format) |
 
 ```json
 {
@@ -140,6 +156,48 @@ Claude Desktop (`claude_desktop_config.json`) and most other clients:
   }
 }
 ```
+
+</details>
+
+<details>
+<summary><b>OpenAI Codex CLI</b></summary>
+
+`%USERPROFILE%\.codex\config.toml`:
+
+```toml
+[mcp_servers.stalker]
+command = 'D:\stalker-mcp\.venv\Scripts\python.exe'
+args = ['D:\stalker-mcp\server.py']
+
+[mcp_servers.stalker.env]
+STALKER_GAME = 'D:\Games\Anomaly'
+STALKER_MO2 = 'D:\Games\Anomaly\MO2'
+```
+
+</details>
+
+<details>
+<summary><b>VS Code (GitHub Copilot)</b></summary>
+
+`.vscode\mcp.json` in your workspace (note `servers`, not `mcpServers`):
+
+```json
+{
+  "servers": {
+    "stalker": {
+      "type": "stdio",
+      "command": "D:\\stalker-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["D:\\stalker-mcp\\server.py"],
+      "env": {
+        "STALKER_GAME": "D:\\Games\\Anomaly",
+        "STALKER_MO2": "D:\\Games\\Anomaly\\MO2"
+      }
+    }
+  }
+}
+```
+
+</details>
 
 **4. Play.** Start the game from MO2 (or ask the assistant to run `game_launch`), load a save,
 and ask away. Check the connection with `game_status`: the bridge should be `онлайн` (online).
@@ -172,7 +230,23 @@ and ask away. Check the connection with `game_status`: the bridge should be `о�
 * **`mo2_set_mod` needs MO2 closed.** MO2 rewrites `modlist.txt` on exit.
 * Strings come from the engine in cp1251. The server decodes them, and Cyrillic in requests
   is sent as cp1251, so it matches the game's own strings.
-* Tool descriptions and messages are in Russian. The models handle that fine.
+* Tool descriptions and messages are in Russian. Large models handle that fine.
+
+## Compatibility
+
+stalker-mcp is a standard MCP server, so it is **not tied to Claude**. Any client that runs local
+(stdio) MCP servers works, with any model inside: Claude, GPT, Kimi, Gemini, Qwen, a local LLM.
+
+| | Status |
+|---|---|
+| Claude Code, Claude Desktop, Codex CLI, Gemini CLI, Kimi CLI, Cursor, VS Code, Cline, LM Studio | ✅ works as is |
+| ChatGPT (web / desktop app) | ❌ connects only to remote HTTP servers, not to a local process |
+| `game_screenshot` | needs a client **and** a model that accept images in tool results; everything else is text |
+| Small local models | may pick tools worse: tool descriptions are in Russian |
+
+> [!WARNING]
+> Don't expose this server to the internet to make it work with ChatGPT. `game_lua` would then
+> let anyone run code on your PC.
 
 ## ⚠️ Security
 
