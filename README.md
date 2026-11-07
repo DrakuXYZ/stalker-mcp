@@ -15,7 +15,8 @@ spawn items, read logs and crashes, take screenshots, resolve mod conflicts.
 ![Windows](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**English** · [Русский](README.ru.md)
+<a href="README.md"><img alt="English" src="https://img.shields.io/badge/English-2ea44f?style=for-the-badge"></a>
+<a href="README.ru.md"><img alt="Русский" src="https://img.shields.io/badge/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-555555?style=for-the-badge"></a>
 
 </div>
 
